@@ -1,106 +1,126 @@
-# المنصف في القدرات
+# Al-Munsif Fi Al-Qudurat
 
-أداة JavaFX تحوّل تصدير محادثة تليجرام (result.json من "Export chat history" في
-Telegram Desktop) إلى عرض PowerPoint منظم وبدون أي أسماء أو صور شخصية.
+A JavaFX tool that converts a Telegram chat export (`result.json` from **Telegram Desktop → Export Chat History**) into a clean, organized PowerPoint presentation without any personal names or profile pictures.
 
-- **مفيش تسجيل دخول أو كود تليفون** — بتشتغل على ملف تصدير Telegram Desktop نفسه.
-- **مفيش اسم شخص ولا صورة بروفايل** في أي سلايد.
-- رسائل متتالية من نفس الشخص بتتجمع؛ سؤال جديد (ترقيم، تغيّر شخص، فجوة وقت) بيبدأ سلايد جديد.
-- أي `@username` بيتشال تلقائيًا، وكذلك رسائل التوقيع/التحويل الآلي.
-- الرسائل المكررة حرفيًا بتتشال، ما عدا أول ظهور لها.
-- المحتوى الطويل أوي بيتقسم على أكتر من سلايد بدل ما الخط يتصغّر جدًا.
+* **No login or phone verification code** — the tool works directly with a Telegram Desktop export file.
+* **No person's name or profile picture** appears on any slide.
+* Consecutive messages from the same person are grouped together; a new question (numbering, sender change, or time gap) starts a new slide.
+* Any `@username` is automatically removed, as well as automated signature/forwarding messages.
+* Exact duplicate messages are removed, keeping only the first occurrence.
+* Very long content is split across multiple slides instead of making the font extremely small.
 
-## ⚠️ حدود الاختبار
+## ⚠️ Testing Limitations
 
-منطق القراءة/التجميع/التنظيف/الحذف كامل ومُختبر فعليًا (نفس النتائج بالظبط
-في كل مرة اتغيّر فيها الكود). لكن الشاشة (JavaFX) وبناء ملف PowerPoint
-(Apache POI) متقدرش أُشغّلهم في بيئتي لأنها ممنوعة من الوصول لـ Maven Central.
-لو طلعت مشكلة أول تشغيل، ابعتيلي نص الخطأ بالظبط.
+The reading, grouping, cleaning, and deduplication logic is fully implemented and tested. The results remain exactly the same across code changes.
 
-## البنية المعمارية (Clean Architecture)
+However, the JavaFX UI and PowerPoint generation (Apache POI) cannot be executed in the current environment because access to Maven Central is blocked.
 
-```
+If you encounter an issue during the first run, send me the **exact error message**.
+
+## Architecture — Clean Architecture
+
+```text
 src/main/java/com/munsif/
-├── MainApp.java                         ← واجهة JavaFX + composition root
+├── MainApp.java                         ← JavaFX UI + composition root
 │
-├── domain/                              ← نماذج بيانات بحتة، صفر اعتماد على أي مكتبة
+├── domain/                              ← Pure data models, zero library dependencies
 │   ├── TelegramMessage.java
 │   ├── TextSegment.java
 │   ├── TextRun.java
 │   ├── ContentItem.java
 │   └── MessageGroup.java
 │
-├── usecase/                             ← منطق العمل، صفر اعتماد على JavaFX/POI/org.json
-│   ├── GeneratePresentationUseCase.java ← الحالة الاستخدامية الرئيسية (orchestration)
-│   ├── TextProcessor.java               ← تنظيف النص، كشف رسائل التوقيع الآلي
-│   ├── Grouper.java                     ← تجميع الرسائل + تقسيم السلايدات الكبيرة
-│   ├── Deduplicator.java                ← حذف المكرر
-│   └── port/                            ← الواجهات (Ports) اللي الـ use case بيعتمد عليها
+├── usecase/                             ← Business logic, zero JavaFX/POI/org.json dependencies
+│   ├── GeneratePresentationUseCase.java ← Main use case / orchestration
+│   ├── TextProcessor.java               ← Text cleaning + automated signature detection
+│   ├── Grouper.java                     ← Message grouping + large-slide splitting
+│   ├── Deduplicator.java                ← Duplicate removal
+│   └── port/                            ← Interfaces used by the use cases
 │       ├── ExportReader.java
 │       ├── PresentationExporter.java
 │       └── LoadedExport.java
 │
-└── infrastructure/                      ← تفاصيل التنفيذ الفعلية (Adapters)
+└── infrastructure/                      ← Implementation details / adapters
     ├── telegram/
-    │   └── TelegramExportReader.java    ← ينفّذ ExportReader باستخدام org.json
+    │   └── TelegramExportReader.java    ← ExportReader implementation using org.json
     └── pptx/
-        └── PptxPresentationWriter.java  ← ينفّذ PresentationExporter باستخدام Apache POI
+        └── PptxPresentationWriter.java  ← PresentationExporter implementation using Apache POI
 ```
 
-**قاعدة الاعتماد (dependency rule):** الأسهم كلها بتتجه لجوه — `infrastructure`
-بيعتمد على `usecase` (بينفّذ الـ ports بتاعته)، و`usecase` بيعتمد على `domain`
-بس. لا `domain` ولا `usecase` عارفين حاجة عن JavaFX أو Apache POI أو org.json.
-النتيجة العملية: لو حبيتي تستبدلي مصدر التصدير بحاجة تانية، أو تصدّري لصيغة
-غير PowerPoint، أو تكتبي unit tests للمنطق، مش هتحتاجي تلمسي غير طبقة
-الـ `infrastructure`.
+### Dependency Rule
 
-## المتطلبات
+All dependencies point inward:
 
-- **JDK 21** — [adoptium.net](https://adoptium.net)
-- **Maven** — [maven.apache.org](https://maven.apache.org/download.cgi)
+`infrastructure` depends on `usecase` by implementing its ports, while `usecase` depends only on `domain`.
 
-```
+Neither `domain` nor `usecase` knows anything about JavaFX, Apache POI, or org.json.
+
+### Practical Benefit
+
+If you want to replace the Telegram export source, export to a different format, or write unit tests for the business logic, you only need to change the `infrastructure` layer.
+
+## Requirements
+
+* **JDK 21** — [adoptium.net](https://adoptium.net?utm_source=chatgpt.com)
+* **Maven** — [maven.apache.org](https://maven.apache.org/download.cgi?utm_source=chatgpt.com)
+
+```bash
 java -version
 mvn -version
 ```
 
-## التشغيل أثناء التطوير
+## Running During Development
 
-```
+```bash
 mvn clean javafx:run
 ```
 
-أو دبل كليك على اختصار `run.bat` لو عملتيه على سطح المكتب (شوفي الأسفل).
+Or simply double-click `run.bat` if you created it on your desktop (see below).
 
-## تشغيل سريع بدون سطر أوامر (run.bat)
+## Quick Launch Without the Command Line — `run.bat`
 
-فولدر المشروع فيه ملف `run.bat`. اعملي اختصار له على سطح المكتب (كليك يمين
-عليه → Send to → Desktop) وسمّيه "المنصف في القدرات". من دلوقتي دبل كليك على
-الاختصار بس، بدون فتح Command Prompt.
+The project folder contains a `run.bat` file.
 
-## بناء نسخة .exe حقيقية (بدون Maven ولا سطر أوامر بعد كده)
+Create a shortcut to it on your desktop:
 
-### الخطوة 1: بناء jar واحد فيه كل حاجة
-```
+**Right-click → Send to → Desktop**
+
+Rename the shortcut to **"Al-Munsif Fi Al-Qudurat"**.
+
+From then on, simply double-click the shortcut to launch the application without opening Command Prompt.
+
+## Building a Real `.exe` Application
+
+### Step 1: Build a Single JAR
+
+```bash
 mvn clean package
 ```
-هيطلعلك `target/al-munsif-fi-al-qudurat.jar` — ملف واحد فيه التطبيق كامل
-بالإضافة لـ JavaFX و Apache POI و org.json، جاهز يشتغل لوحده.
 
-### الخطوة 2: jpackage
-`jpackage` بييجي جاهز مع أي JDK 17+ (يعني عندك أصلًا، مش محتاجة تنزلي حاجة
-زيادة). فولدر `target` فيه أكتر من jar (Maven بيسيب نسخة احتياطية باسم
-`original-...jar`)، فعشان نتجنب أي تعارض، ننسخ الـ jar الصحيح لوحده لفولدر
-نضيف الأول:
+This creates:
 
+```text
+target/al-munsif-fi-al-qudurat.jar
 ```
+
+The JAR contains the complete application along with JavaFX, Apache POI, and org.json, ready to be packaged.
+
+### Step 2: Create the Application Image with `jpackage`
+
+`jpackage` is included with JDK 17+.
+
+The `target` folder may contain multiple JAR files because Maven keeps a backup named `original-...jar`.
+
+To avoid any conflict, first copy the correct JAR into a clean folder:
+
+```cmd
 mkdir dist-input
 copy target\al-munsif-fi-al-qudurat.jar dist-input\
 ```
 
-بعدها:
+Then run:
 
-```
+```cmd
 jpackage --type app-image ^
   --input dist-input ^
   --dest dist ^
@@ -109,34 +129,66 @@ jpackage --type app-image ^
   --main-class com.munsif.Launcher
 ```
 
-النتيجة: فولدر `dist\AlMunsifFiAlQudurat\` فيه ملف
-`AlMunsifFiAlQudurat.exe` — انقلي الفولدر ده كله لسطح المكتب (أو أي مكان)،
-ودبل كليك على الـ .exe جواه. هيفتح على طول من غير أي Command Prompt، ومن
-غير ما يحتاج الجهاز يكون فيه Java أصلًا — الـ runtime كامل متضمّن جوه الفولدر.
+The result will be:
 
-لو عايزة ملف تثبيت حقيقي (.msi) بدل فولدر، غيّري `--type app-image` لـ
-`--type msi` — لكن ده محتاج تثبيت [WiX Toolset](https://wixtoolset.org/)
-على جهازك الأول.
-
-**ملاحظة:** الخطوة دي (jpackage) هي الحاجة الوحيدة في المشروع اللي متقدرش
-أختبرها فعليًا عندي. لو طلعت مشكلة، ابعتيلي نص الخطأ بالظبط.
-
-## لو عايزة تبيعيها لعملاء
-
-كل عميل هيستخدم نفس المبدأ: يعمل تصدير لأي شات هو عضو فيه من Telegram Desktop
-بتاعه، ويشغّل الأداة (أو ملف .exe الجاهز) على الفولدر الناتج. الأداة نفسها
-مش بتلمس حساب حد ولا بتتجاوز أي حماية في تليجرام.
-
-**نقطة تستاهل تفكير:** لو نويتي تحطي كود المشروع على GitHub كـ repository
-عام (public)، أي حد هيقدر ياخده ويستخدمه أو يبيعه بنفسه، وده ممكن يتعارض مع
-نيتك تبيعيه لعملاء. لو عايزة تحافظي على حقك التجاري، الأنسب يكون الـ repo
-**خاص (private)** — تشاركيه مع نفسك بس أو مع أي حد تحددي، وتفضل ملكية الكود
-والحق التجاري ليكي وحدك. لو عايزة الكود يبقى عام برضو، فكري في ترخيص غير
-مفتوح تمامًا (زي "كل الحقوق محفوظة" بدل MIT/Apache) عشان تحافظي على حق البيع.
-
-## بنية الفولدر الكاملة
-
+```text
+dist\AlMunsifFiAlQudurat\
 ```
+
+Inside it, you will find:
+
+```text
+AlMunsifFiAlQudurat.exe
+```
+
+You can move the entire `AlMunsifFiAlQudurat` folder to the desktop or any other location and double-click the `.exe` to launch the application.
+
+The packaged application includes its own Java runtime, so the target computer does **not** need Java installed separately.
+
+### Creating a Real Installer
+
+If you want a real `.msi` installer instead of an application folder, change:
+
+```cmd
+--type app-image
+```
+
+to:
+
+```cmd
+--type msi
+```
+
+This requires the [WiX Toolset](https://wixtoolset.org/?utm_source=chatgpt.com) to be installed first.
+
+### Note
+
+`jpackage` is the only part of the project that cannot be fully tested in the current environment.
+
+If you encounter an issue, send me the **exact error message**.
+
+## Selling the Application to Customers
+
+Each customer follows the same process:
+
+1. Export any Telegram chat they are a member of using Telegram Desktop.
+2. Use the resulting export folder/file with the application.
+3. Run the application or the prepared `.exe`.
+4. Generate the PowerPoint presentation.
+
+The application does not access anyone's Telegram account and does not bypass any Telegram security or protection mechanisms.
+
+### Important Commercial Consideration
+
+If you plan to publish the source code on GitHub as a **public repository**, anyone can access, copy, modify, and potentially redistribute or sell the software.
+
+If you intend to sell the application commercially, a **private repository** is generally more appropriate for keeping the source code under your control.
+
+If you decide to make the repository public, consider using a license that clearly reserves your commercial rights, such as a **proprietary / "All Rights Reserved" license**, rather than permissive open-source licenses such as MIT or Apache 2.0.
+
+## Complete Project Structure
+
+```text
 al-munsif-fi-al-qudurat/
 ├── pom.xml
 ├── README.md
