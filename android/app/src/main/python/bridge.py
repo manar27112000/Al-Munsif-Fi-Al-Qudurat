@@ -166,7 +166,7 @@ def logout():
 def list_chats():
     async def go():
         out = []
-        async for d in _client.iter_dialogs():
+        async for d in _client.iter_dialogs(limit=400):
             ent = d.entity
             if getattr(ent, "bot", False) or getattr(ent, "deleted", False):
                 continue
@@ -179,7 +179,7 @@ def list_chats():
             out.append({"id": d.id, "name": d.name or "(بدون اسم)", "kind": kind})
         return out
     try:
-        return _ok(chats=_run(go(), 180))
+        return _ok(chats=_run(go(), 240))
     except Exception as e:  # noqa
         _log_exc(_state["dir"])
         return _err(_map_error(e), e)
