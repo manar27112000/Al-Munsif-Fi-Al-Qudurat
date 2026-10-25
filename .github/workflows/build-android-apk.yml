@@ -1,0 +1,57 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ android-app ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: اختبار منطق البايثون (من غير تليجرام)
+        run: python tests/test_core.py tests/fixture.zip /tmp/out.pptx 60
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Publish APK to Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk AlMunsif.apk
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest AlMunsif.apk \
+            --title "المنصف في القدرات — تطبيق أندرويد" \
+            --notes "نزّلي ملف AlMunsif.apk وثبّتيه على موبايلك (هتحتاجي تسمحي بالتثبيت من مصدر غير معروف)."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AlMunsif-APK
+          path: android/AlMunsif.apk
