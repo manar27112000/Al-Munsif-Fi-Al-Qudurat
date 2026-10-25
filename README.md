@@ -9,6 +9,13 @@ A JavaFX tool that converts a Telegram chat export (`result.json` from **Telegra
 * Exact duplicate messages are removed, keeping only the first occurrence.
 * Very long content is split across multiple slides instead of making the font extremely small.
 
+## 📱 Android app (use it directly from your phone)
+
+There is also an Android version in [`android/`](android/) that logs into your own Telegram account, lets you pick the group, the date range (from/to) and the grouping gap in seconds, and builds the same PowerPoint on the phone itself — no desktop export needed.
+
+* Download **`AlMunsif.apk`** from the [Releases page](../../releases/tag/android-latest) (built automatically by GitHub Actions on every push).
+* First run: enter your own `api_id` / `api_hash` from <https://my.telegram.org/apps>, then your phone number; the login code arrives inside the Telegram app. Details in [`android/README.md`](android/README.md).
+
 ## ⚠️ Testing Limitations
 
 The reading, grouping, cleaning, and deduplication logic is fully implemented and tested. The results remain exactly the same across code changes.
